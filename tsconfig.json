@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "es2017",
+    "module": "esnext",
+    "moduleResolution": "Node",
+    "outDir": "build",
+    "sourceMap": true,
+    "lib": [
+      "ESNext",
+    ],
+  },
+  "exclude": [
+    "node_modules"
+  ]
+}
