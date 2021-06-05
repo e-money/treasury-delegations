@@ -12,12 +12,13 @@ import { writeFileSync } from 'fs'
 const apiUrl = 'https://emoney.validator.network/api'
 const treasuryAddress = 'emoney1cpfn66xumevrx755m4qxgezw9j5s86qkan5ch8'
 const ignoredAddresses = [
-  'emoneyvaloper1ml9whlf0qpw2l58xaqaac24za5rm3tg5k64ka0' // Dual Stacking Spare
+  'emoneyvaloper1ml9whlf0qpw2l58xaqaac24za5rm3tg5k64ka0' // Duplicate: Dual Stacking Spare
 ]
 const ungm = 1000000
-const baselineDelegation = 750000 * ungm
-const maximumBaselineDelegation = 1000000 * ungm
-const maximumBonusDelegation = 500000 * ungm
+const medianDelegation = 500000 * ungm
+const maximumBaselineDelegation = 750000 * ungm
+const maximumSelfDelegationBonus = 500000 * ungm
+const maximumCommunityDelegationBonus = 250000 * ungm
 const selfDelegationMultiplier = 2
 
 const client = LcdClient.withExtensions(
@@ -27,6 +28,7 @@ const client = LcdClient.withExtensions(
 )
 
 class Delegations {
+  numDelegators: number
   selfDelegation: number
   projectDelegation: number
   communityDelegation: number
@@ -37,10 +39,11 @@ class Target {
   moniker: string
   operatorAddress: string
   commission: number
-  delegations: Delegations
-  baseAllocation: number
-  bonusAllocation: number
-  totalAllocation: number
+  currentDelegations: Delegations
+  baseDelegation: number
+  selfDelegationBonus: number
+  communityDelegationBonus: number
+  totalDelegation: number
 }
 
 function includeValidator (validator): boolean {
@@ -68,6 +71,7 @@ async function getDelegations (validatorAddress): Promise<Delegations> {
     'emoney1hzeue94rtumz7adxedds7sh56guhyv4tuvmek9']
 
   const result: Delegations = {
+    numDelegators: 0,
     selfDelegation: 0,
     projectDelegation: 0,
     communityDelegation: 0,
@@ -76,6 +80,7 @@ async function getDelegations (validatorAddress): Promise<Delegations> {
 
   const selfDelegationAddress = Bech32.encode('emoney', Bech32.decode(validatorAddress).data)
   const delegations = await client.staking.validatorDelegations(validatorAddress)
+  result.numDelegators = delegations.result.length
   for (const delegation of delegations.result) {
     result.totalDelegation += Number(delegation.balance.amount)
 
@@ -98,24 +103,26 @@ async function createTargets (validators): Promise<Target[]> {
 
     const commission = Number(validator.commission.commission_rates.rate)
     const commissionAdjustment = medianCommission(validators) / commission
-    const delegations = await getDelegations(validator.operator_address)
-    const baseAllocation = Math.min(maximumBaselineDelegation, Math.round(commissionAdjustment * baselineDelegation))
-    const bonusAllocation = Math.min(maximumBonusDelegation, Math.round(delegations.selfDelegation * selfDelegationMultiplier))
-    const totalAllocation = baseAllocation + bonusAllocation
+    const currentDelegations = await getDelegations(validator.operator_address)
+    const baseDelegation = Math.min(maximumBaselineDelegation, Math.round(commissionAdjustment * medianDelegation))
+    const selfDelegationBonus = Math.min(maximumSelfDelegationBonus, Math.round(currentDelegations.selfDelegation * selfDelegationMultiplier))
+    const communityDelegationBonus = Math.min(maximumCommunityDelegationBonus, currentDelegations.communityDelegation)
+    const totalDelegation = baseDelegation + selfDelegationBonus + communityDelegationBonus
 
     result.push({
       moniker: validator.description.moniker,
       operatorAddress: validator.operator_address,
       commission,
-      delegations,
-      baseAllocation: baseAllocation,
-      bonusAllocation: bonusAllocation,
-      totalAllocation: totalAllocation
+      currentDelegations,
+      baseDelegation,
+      selfDelegationBonus,
+      communityDelegationBonus,
+      totalDelegation
     })
   }
 
   result.sort(function (left, right) {
-    return right.totalAllocation - left.totalAllocation
+    return right.totalDelegation - left.totalDelegation
   })
 
   return result
@@ -125,19 +132,20 @@ function writeCsv (targets: Target[], fileName: string) {
   let currentTotalDelegations = 0
   let updatedTotalDelegations = 0
   for (const target of targets) {
-    currentTotalDelegations += target.delegations.totalDelegation
-    updatedTotalDelegations += target.totalAllocation + target.delegations.selfDelegation + target.delegations.communityDelegation
+    currentTotalDelegations += target.currentDelegations.totalDelegation
+    updatedTotalDelegations += target.totalDelegation + target.currentDelegations.selfDelegation + target.currentDelegations.communityDelegation
   }
+  console.dir({ currentTotalDelegations, updatedTotalDelegations })
 
-  let buffer = 'Moniker;Operator Address;Commission;Self Delegation;Project Delegation;Community Delegation;Base Allocation;Bonus Allocation;Total Allocation;Current Voting Power;Updated Voting Power;Delta Voting Power\n'
+  let buffer = 'Moniker,Commission,Number of Delegations,Current Self Delegation,Current Community Delegation,New Base Delegation,Self Delegation Bonus,Community Delegation Bonus,Total Delegation,Current Voting Power,Updated Voting Power,Delta Voting Power\n'
   for (const target of targets) {
-    const currentVotingPower = target.delegations.totalDelegation / currentTotalDelegations
-    const updatedVotingPower = (target.totalAllocation + target.delegations.selfDelegation + target.delegations.communityDelegation) / updatedTotalDelegations
+    const currentVotingPower = target.currentDelegations.totalDelegation / currentTotalDelegations
+    const updatedVotingPower = (target.totalDelegation + target.currentDelegations.selfDelegation + target.currentDelegations.communityDelegation) / updatedTotalDelegations
     const deltaVotingPower = updatedVotingPower - currentVotingPower
-    buffer += `${target.moniker};${target.operatorAddress};${Number(target.commission * 100).toFixed(2)}%;` +
-    `${(target.delegations.selfDelegation / ungm).toFixed(0)};${(target.delegations.projectDelegation / ungm).toFixed(0)};${(target.delegations.communityDelegation / ungm).toFixed(0)};` +
-    `${(target.baseAllocation / ungm).toFixed(0)};${(target.bonusAllocation / ungm).toFixed(0)};${(target.totalAllocation / ungm).toFixed(0)};` +
-    `${Number(currentVotingPower * 100).toFixed(4)};${Number(updatedVotingPower * 100).toFixed(4)}%;${Number(deltaVotingPower * 100).toFixed(4)}%\n`
+    buffer += `${target.moniker},${target.commission.toFixed(2)},` +
+    `${target.currentDelegations.numDelegators},${(target.currentDelegations.selfDelegation / ungm).toFixed(0)},${(target.currentDelegations.communityDelegation / ungm).toFixed(0)},` +
+    `${(target.baseDelegation / ungm).toFixed(0)},${(target.selfDelegationBonus / ungm).toFixed(0)},${(target.communityDelegationBonus / ungm).toFixed(0)},${(target.totalDelegation / ungm).toFixed(0)},` +
+    `${currentVotingPower.toFixed(4)},${updatedVotingPower.toFixed(4)},${deltaVotingPower.toFixed(4)}\n`
   }
 
   writeFileSync(fileName, buffer)

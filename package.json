@@ -22,7 +22,6 @@
     "@cosmjs/launchpad": "^0.25.3",
     "@types/mathjs": "^9.3.2",
     "eslint": "^7.27.0",
-    "install": "^0.13.0",
     "mathjs": "^9.4.1",
     "typescript": "^4.3.2"
   },
