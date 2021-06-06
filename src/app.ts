@@ -122,7 +122,7 @@ async function createTargets (validators): Promise<Target[]> {
   }
 
   result.sort(function (left, right) {
-    return right.totalDelegation - left.totalDelegation
+    return left.moniker.localeCompare(right.moniker)
   })
 
   return result
