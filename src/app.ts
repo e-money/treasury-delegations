@@ -8,7 +8,6 @@ import {
   MsgDelegate,
   MsgUndelegate
 } from '@cosmjs/launchpad'
-import { BondStatus } from '@cosmjs/launchpad/build/lcdapi/staking.js'
 import { median } from 'mathjs'
 import { writeFileSync } from 'fs'
 
@@ -16,7 +15,7 @@ import { writeFileSync } from 'fs'
 const apiUrl = 'https://emoney.validator.network/api'
 const treasuryAddress = 'emoney1cpfn66xumevrx755m4qxgezw9j5s86qkan5ch8'
 const ignoredAddresses = [
-  'emoneyvaloper1ml9whlf0qpw2l58xaqaac24za5rm3tg5k64ka0' // Duplicate: Dual Stacking Spare
+  'emoneyvaloper160xfqsykvyt3yctzm67v9pfhkp6nj0r3ng2hhc' // Duplicate: Dual Stacking
 ]
 const ungm = 1000000
 const medianDelegation = 500000 * ungm
@@ -51,14 +50,14 @@ class Target {
 }
 
 function includeValidator (validator): boolean {
-  if (validator.jailed || validator.status !== BondStatus.Bonded) return false
+  if (validator.jailed) return false
   if (ignoredAddresses.includes(validator.operator_address)) return false
   return true
 }
 
-function medianCommission (validators): number {
+function getMedianCommission (validators): number {
   const commissions: number[] = []
-  for (const validator of validators.result) {
+  for (const validator of validators) {
     if (includeValidator(validator)) {
       commissions.push(Number(validator.commission.commission_rates.rate))
     }
@@ -101,12 +100,14 @@ async function getDelegations (validatorAddress): Promise<Delegations> {
 }
 
 async function createTargets (validators): Promise<Target[]> {
+  const medianCommission = getMedianCommission(validators)
+  console.log(`Median commission: ${medianCommission}`)
   const result: Target[] = []
-  for (const validator of validators.result) {
+  for (const validator of validators) {
     if (!includeValidator(validator)) continue
 
     const commission = Number(validator.commission.commission_rates.rate)
-    const commissionAdjustment = medianCommission(validators) / commission
+    const commissionAdjustment = medianCommission / commission
     const currentDelegations = await getDelegations(validator.operator_address)
     const baseDelegation = Math.min(maximumBaselineDelegation, Math.round(commissionAdjustment * medianDelegation))
     const selfDelegationBonus = Math.min(maximumSelfDelegationBonus, Math.round(currentDelegations.selfDelegation * selfDelegationMultiplier))
@@ -141,11 +142,11 @@ async function createMessages (targets: Target[]): Promise<Msg[]> {
   for (const delegation of delegations.result) {
     const target = targets.find(item => item.operatorAddress === delegation.validator_address)
     if (!target) {
-      console.log(`Skipping: ${delegation.validator_address}`)
-      continue
+      console.log(`Removing: ${delegation.validator_address}`)
     }
     const targetDelegation = target ? target.totalDelegation : 0
     const deltaDelegation = targetDelegation - Number(delegation.balance.amount)
+    if (Math.abs(deltaDelegation) < 1000000) continue
     if (deltaDelegation > 0) {
       const msg: MsgDelegate = {
         type: 'cosmos-sdk/MsgDelegate',
@@ -234,7 +235,10 @@ function writeCsv (targets: Target[], fileName: string) {
   writeFileSync(fileName, buffer)
 }
 
-const validators = await client.staking.validators()
+const bondedValidators = await client.staking.validators({ status: 'bonded' })
+const unbondingValidators = await client.staking.validators({ status: 'unbonding' })
+const unbondedValidators = await client.staking.validators({ status: 'unbonded' })
+const validators = bondedValidators.result.concat(unbondingValidators.result).concat(unbondedValidators.result)
 const targets = await createTargets(validators)
 writeCsv(targets, 'allocations.csv')
 const messages = await createMessages(targets)
