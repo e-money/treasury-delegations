@@ -15,8 +15,7 @@ As such self delegations are rewarded with a delegation bonus, calculated as the
 
 Finally, to incentivise outreach and promotion of their e-Money validator service, the treasury will also match the first 250000 NGM community delegations. 
 
-Moving forward it is the intention to adjust delegations on a monthly basis using the below algorithm. The initial rebalancing of delegations will take
-place on June 14th, 2021, in order to allow time for validators to make changes.
+Moving forward it is the intention to adjust delegations on a monthly basis (around the 21st) using the below algorithm. 
 
 ## Algorithm
 The delegation algorithm uses the following variables when considering how much to allocate to a validator:
