@@ -15,7 +15,8 @@ import { writeFileSync } from 'fs'
 const apiUrl = 'https://emoney.validator.network/api'
 const treasuryAddress = 'emoney1cpfn66xumevrx755m4qxgezw9j5s86qkan5ch8'
 const ignoredAddresses = [
-  'emoneyvaloper160xfqsykvyt3yctzm67v9pfhkp6nj0r3ng2hhc' // Duplicate: Dual Stacking
+  'emoneyvaloper160xfqsykvyt3yctzm67v9pfhkp6nj0r3ng2hhc', // Duplicate: Dual Stacking
+  'emoneyvaloper1c9vmm8e4gqgxvsc8qpm3snkzjq3fezr29t4aap' // Duplicate: Winter Validator
 ]
 const ungm = 1000000
 const medianDelegation = 500000 * ungm
