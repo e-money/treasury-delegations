@@ -15,7 +15,7 @@ As such self delegations are rewarded with a delegation bonus, calculated as the
 
 Finally, to incentivise outreach and promotion of their e-Money validator service, the treasury will also match the first 250000 NGM community delegations. 
 
-Moving forward it is the intention to adjust delegations around the start of on a month using the below algorithm. 
+Moving forward it is the intention to adjust delegations around the start of each a month using the below algorithm. 
 
 ## Algorithm
 The delegation algorithm uses the following variables when considering how much to allocate to a validator:
