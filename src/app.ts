@@ -15,6 +15,7 @@ const medianDelegation = 500000 * ungm
 const maximumBaselineDelegation = 750000 * ungm
 const maximumSelfDelegationBonus = 500000 * ungm
 const maximumCommunityDelegationBonus = 250000 * ungm
+const minimumExternalDelegations = 1000 * ungm
 const selfDelegationMultiplier = 2
 const commissionFraction = 1000000000000000000
 
@@ -110,7 +111,6 @@ async function createTargets (client, validators: Validator[]): Promise<Target[]
   const result: Target[] = []
   for (const validator of validators) {
     if (!includeValidator(validator)) continue
-
     const commission = Number(validator.commission.commissionRates.rate) / commissionFraction
     const commissionAdjustment = medianCommission / commission
     const currentDelegations = await getDelegations(client, validator.operatorAddress)
@@ -118,6 +118,12 @@ async function createTargets (client, validators: Validator[]): Promise<Target[]
     const selfDelegationBonus = Math.min(maximumSelfDelegationBonus, Math.round(currentDelegations.selfDelegation * selfDelegationMultiplier))
     const communityDelegationBonus = Math.min(maximumCommunityDelegationBonus, currentDelegations.communityDelegation)
     const totalDelegation = baseDelegation + selfDelegationBonus + communityDelegationBonus
+
+    // const externalDelegations = currentDelegations.totalDelegation - currentDelegations.treasuryDelegation
+    // if (externalDelegations < minimumExternalDelegations) {
+    //   console.log(`Below minimum external delegations: ${validator.description.moniker} (${validator.operatorAddress}) @ ${externalDelegations / ungm} NGM`)
+    //   continue
+    // }
 
     result.push({
       moniker: validator.description.moniker,

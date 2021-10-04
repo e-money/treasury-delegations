@@ -1,5 +1,8 @@
 # Automated Treasury Delegations
 
+**Upcoming Changes**
+Due to high demand we'll be adjusting the eligibility requirements from November 2021. Only validators with an excess of 1000 NGM at stake through external delegations will be eligible to receive treasury delegations. This number is expected to increase over time.
+
 ## Rationale
 The treasury delegations are intended as a "Universal Basic Income" to help cover validator operating costs.
 As validators have different commission levels, delegations will be adjusted accordingly, so that high commission validators receive a
