@@ -1,10 +1,5 @@
 # Automated Treasury Delegations
 
-Some changes to how delegations from the treasury are distributed among the validator set will be put into effect in the near future. The objective of the changes 
-is to better reward network commitment and long term sustainable network participation.
-
-The changes are detailed below.
-
 ## Rationale
 The treasury delegations are intended as a "Universal Basic Income" to help cover validator operating costs.
 As validators have different commission levels, delegations will be adjusted accordingly, so that high commission validators receive a
@@ -46,3 +41,7 @@ totalDelegation = baseDelegation + selfDelegationBonus + communityDelegationBonu
 
 ## Example Data
 Example data is available here: [allocations.csv](allocations.csv)
+
+## How to Apply
+
+Create a Pull Request that adds your validator to the validatorWhitelist in [data/configuration.json](data/configuration.json).
