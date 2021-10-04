@@ -1,13 +1,15 @@
 {
   "compilerOptions": {
-    "target": "es2017",
-    "module": "esnext",
+    "target": "ES2018",
+    "module": "commonjs",
     "moduleResolution": "Node",
     "outDir": "build",
     "sourceMap": true,
     "lib": [
       "ESNext",
     ],
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true
   },
   "exclude": [
     "node_modules"

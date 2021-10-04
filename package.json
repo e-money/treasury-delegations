@@ -2,7 +2,6 @@
   "name": "treasury-delegations",
   "version": "1.0.0",
   "description": "",
-  "type": "module",
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -18,8 +17,10 @@
   },
   "homepage": "https://github.com/e-money/treasury-delegations#readme",
   "dependencies": {
-    "@cosmjs/encoding": "^0.25.3",
-    "@cosmjs/launchpad": "^0.25.3",
+    "@cosmjs/encoding": "^0.26.1",
+    "@cosmjs/proto-signing": "^0.26.1",
+    "@cosmjs/stargate": "^0.26.1",
+    "@cosmjs/tendermint-rpc": "^0.26.1",
     "@types/mathjs": "^9.3.2",
     "eslint": "^7.27.0",
     "mathjs": "^9.4.1",

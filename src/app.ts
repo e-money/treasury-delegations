@@ -1,41 +1,27 @@
 import { Bech32 } from '@cosmjs/encoding'
-import {
-  LcdClient,
-  setupDistributionExtension,
-  setupStakingExtension,
-  coin,
-  Msg,
-  MsgDelegate,
-  MsgUndelegate
-} from '@cosmjs/launchpad'
+import { QueryClient, setupDistributionExtension, setupStakingExtension, coin } from '@cosmjs/stargate'
+import { Tendermint34Client } from '@cosmjs/tendermint-rpc'
 import { median } from 'mathjs'
 import { writeFileSync } from 'fs'
+import { DelegationResponse, Validator } from 'cosmjs-types/cosmos/staking/v1beta1/staking'
+import { BondStatusString } from '@cosmjs/stargate/build/queries/staking'
+import * as configuration from '../data/configuration.json'
 
 // Configuration
-const apiUrl = 'https://emoney.validator.network/api'
+const rpcUrl = 'https://emoney.validator.network'
 const treasuryAddress = 'emoney1cpfn66xumevrx755m4qxgezw9j5s86qkan5ch8'
-const ignoredAddresses = [
-  'emoneyvaloper160xfqsykvyt3yctzm67v9pfhkp6nj0r3ng2hhc', // Duplicate: Dual Stacking
-  'emoneyvaloper1c9vmm8e4gqgxvsc8qpm3snkzjq3fezr29t4aap', // Duplicate: Winter Validator
-  'emoneyvaloper1ja6hqcr2p96w8u2a07qtdtvjsguc38km6xr964', // Unverified: Anaconda
-  'emoneyvaloper1kanv992c9cu0mqukwj707fdfn4kg5y2cdqt390' // Unverified: Top Rank
-]
 const ungm = 1000000
 const medianDelegation = 500000 * ungm
 const maximumBaselineDelegation = 750000 * ungm
 const maximumSelfDelegationBonus = 500000 * ungm
 const maximumCommunityDelegationBonus = 250000 * ungm
 const selfDelegationMultiplier = 2
-
-const client = LcdClient.withExtensions(
-  { apiUrl },
-  setupStakingExtension,
-  setupDistributionExtension
-)
+const commissionFraction = 1000000000000000000
 
 class Delegations {
   numDelegators: number
   selfDelegation: number
+  treasuryDelegation: number
   projectDelegation: number
   communityDelegation: number
   totalDelegation: number
@@ -52,66 +38,82 @@ class Target {
   totalDelegation: number
 }
 
-function includeValidator (validator): boolean {
+function includeValidator (validator: Validator): boolean {
   if (validator.jailed) return false
-  if (ignoredAddresses.includes(validator.operator_address)) return false
-  return true
+  return configuration.validatorWhitelist.includes(validator.operatorAddress)
 }
 
-function getMedianCommission (validators): number {
+function getMedianCommission (validators: Validator[]): number {
   const commissions: number[] = []
   for (const validator of validators) {
     if (includeValidator(validator)) {
-      commissions.push(Number(validator.commission.commission_rates.rate))
+      commissions.push(Number(validator.commission.commissionRates.rate) / commissionFraction)
     }
   }
   return median(commissions)
 }
 
-async function getDelegations (validatorAddress): Promise<Delegations> {
+async function getPaginatedDelegations (client, validatorAddress: string) : Promise<DelegationResponse[]> {
+  let response = await client.staking.validatorDelegations(validatorAddress)
+  let result: DelegationResponse[] = response.delegationResponses
+  while (response.pagination.nextKey.length > 0) {
+    response = await client.staking.validatorDelegations(validatorAddress, response.pagination.nextKey)
+    result = result.concat(response.delegationResponses)
+  }
+  return result
+}
+
+async function getDelegations (client, validatorAddress: string): Promise<Delegations> {
   const projectAddresses = [
     treasuryAddress,
-    'emoney1hdv69euvy9d6krkrky6c9ngg00jglra89chkld',
     'emoney10r47ldzrc2nj6p85cg9hfy3q7d6ce5870qfc3y',
+    'emoney12lceurdvgj0qr4kldwakjc8cvap6t4049jwtmc',
+    'emoney1hdv69euvy9d6krkrky6c9ngg00jglra89chkld',
+    'emoney1cpfn66xumevrx755m4qxgezw9j5s86qkan5ch8',
     'emoney1glwrypvl8ulz80n9z2gk6ey2dxey2vncfpd6s4',
-    'emoney1hzeue94rtumz7adxedds7sh56guhyv4tuvmek9']
+    'emoney13dpmrp5sppqdrkry6jyy8clj3ts0923n6wqgng',
+    'emoney1hzeue94rtumz7adxedds7sh56guhyv4tuvmek9'
+  ]
 
   const result: Delegations = {
     numDelegators: 0,
     selfDelegation: 0,
+    treasuryDelegation: 0,
     projectDelegation: 0,
     communityDelegation: 0,
     totalDelegation: 0
   }
 
   const selfDelegationAddress = Bech32.encode('emoney', Bech32.decode(validatorAddress).data)
-  const delegations = await client.staking.validatorDelegations(validatorAddress)
-  result.numDelegators = delegations.result.length
-  for (const delegation of delegations.result) {
-    result.totalDelegation += Number(delegation.balance.amount)
+  const delegationResponses = await getPaginatedDelegations(client, validatorAddress)
+  result.numDelegators = delegationResponses.length
+  for (const delegationResponse of delegationResponses) {
+    result.totalDelegation += Number(delegationResponse.balance.amount)
 
     // Classify delegation
-    if (selfDelegationAddress === delegation.delegator_address) {
-      result.selfDelegation += Number(delegation.balance.amount)
-    } else if (projectAddresses.includes(delegation.delegator_address)) {
-      result.projectDelegation += Number(delegation.balance.amount)
+    if (selfDelegationAddress === delegationResponse.delegation.delegatorAddress) {
+      result.selfDelegation += Number(delegationResponse.balance.amount)
+    } else if (treasuryAddress === delegationResponse.delegation.delegatorAddress) {
+      result.treasuryDelegation += Number(delegationResponse.balance.amount)
+    } else if (projectAddresses.includes(delegationResponse.delegation.delegatorAddress)) {
+      result.projectDelegation += Number(delegationResponse.balance.amount)
     } else {
-      result.communityDelegation += Number(delegation.balance.amount)
+      result.communityDelegation += Number(delegationResponse.balance.amount)
     }
   }
   return result
 }
 
-async function createTargets (validators): Promise<Target[]> {
+async function createTargets (client, validators: Validator[]): Promise<Target[]> {
   const medianCommission = getMedianCommission(validators)
   console.log(`Median commission: ${medianCommission}`)
   const result: Target[] = []
   for (const validator of validators) {
     if (!includeValidator(validator)) continue
 
-    const commission = Number(validator.commission.commission_rates.rate)
+    const commission = Number(validator.commission.commissionRates.rate) / commissionFraction
     const commissionAdjustment = medianCommission / commission
-    const currentDelegations = await getDelegations(validator.operator_address)
+    const currentDelegations = await getDelegations(client, validator.operatorAddress)
     const baseDelegation = Math.min(maximumBaselineDelegation, Math.round(commissionAdjustment * medianDelegation))
     const selfDelegationBonus = Math.min(maximumSelfDelegationBonus, Math.round(currentDelegations.selfDelegation * selfDelegationMultiplier))
     const communityDelegationBonus = Math.min(maximumCommunityDelegationBonus, currentDelegations.communityDelegation)
@@ -119,7 +121,7 @@ async function createTargets (validators): Promise<Target[]> {
 
     result.push({
       moniker: validator.description.moniker,
-      operatorAddress: validator.operator_address,
+      operatorAddress: validator.operatorAddress,
       commission,
       currentDelegations,
       baseDelegation,
@@ -137,37 +139,43 @@ async function createTargets (validators): Promise<Target[]> {
   return result
 }
 
-async function createMessages (targets: Target[]): Promise<Msg[]> {
-  const result: Msg[] = []
-  const delegations = await client.staking.delegatorDelegations(treasuryAddress)
+async function getPaginatedDelegatorDelegations (client, delegatorAddress: string) : Promise<DelegationResponse[]> {
+  let response = await client.staking.delegatorDelegations(delegatorAddress)
+  let result: DelegationResponse[] = response.delegationResponses
+  while (response.pagination.nextKey.length > 0) {
+    response = await client.staking.delegatorDelegations(delegatorAddress, response.pagination.nextKey)
+    result = result.concat(response.delegationResponses)
+  }
+  return result
+}
+
+async function createMessages (client, targets: Target[]): Promise<any[]> {
+  const result = []
+  const delegationResponses = await getPaginatedDelegatorDelegations(client, treasuryAddress)
 
   // Adjust existing delegations
-  for (const delegation of delegations.result) {
-    const target = targets.find(item => item.operatorAddress === delegation.validator_address)
+  for (const delegationResponse of delegationResponses) {
+    const target = targets.find(item => item.operatorAddress === delegationResponse.delegation.validatorAddress)
     if (!target) {
-      console.log(`Removing: ${delegation.validator_address}`)
+      console.log(`Removing: ${delegationResponse.delegation.validatorAddress}`)
     }
     const targetDelegation = target ? target.totalDelegation : 0
-    const deltaDelegation = targetDelegation - Number(delegation.balance.amount)
+    const deltaDelegation = targetDelegation - Number(delegationResponse.balance.amount)
     if (Math.abs(deltaDelegation) < 1000000) continue
     if (deltaDelegation > 0) {
-      const msg: MsgDelegate = {
-        type: 'cosmos-sdk/MsgDelegate',
-        value: {
-          delegator_address: treasuryAddress,
-          validator_address: delegation.validator_address,
-          amount: coin(deltaDelegation, 'ungm')
-        }
+      const msg = {
+        '@type': '/cosmos.staking.v1beta1.MsgDelegate',
+        delegator_address: treasuryAddress,
+        validator_address: delegationResponse.delegation.validatorAddress,
+        amount: coin(deltaDelegation, 'ungm')
       }
       result.push(msg)
     } else if (deltaDelegation < 0) {
-      const msg: MsgUndelegate = {
-        type: 'cosmos-sdk/MsgUndelegate',
-        value: {
-          delegator_address: treasuryAddress,
-          validator_address: delegation.validator_address,
-          amount: coin(-deltaDelegation, 'ungm')
-        }
+      const msg = {
+        '@type': '/cosmos.staking.v1beta1.MsgUndelegate',
+        delegator_address: treasuryAddress,
+        validator_address: delegationResponse.delegation.validatorAddress,
+        amount: coin(-deltaDelegation, 'ungm')
       }
       result.push(msg)
     }
@@ -175,15 +183,13 @@ async function createMessages (targets: Target[]): Promise<Msg[]> {
 
   // Add new delegations
   for (const target of targets) {
-    const delegation = delegations.result.find(item => item.validator_address === target.operatorAddress)
+    const delegation = delegationResponses.find(item => item.delegation.validatorAddress === target.operatorAddress)
     if (!delegation) {
-      const msg: MsgDelegate = {
-        type: 'cosmos-sdk/MsgDelegate',
-        value: {
-          delegator_address: treasuryAddress,
-          validator_address: target.operatorAddress,
-          amount: coin(target.totalDelegation, 'ungm')
-        }
+      const msg = {
+        '@type': '/cosmos.staking.v1beta1.MsgDelegate',
+        delegator_address: treasuryAddress,
+        validator_address: target.operatorAddress,
+        amount: coin(target.totalDelegation, 'ungm')
       }
       result.push(msg)
     }
@@ -191,13 +197,20 @@ async function createMessages (targets: Target[]): Promise<Msg[]> {
   return result
 }
 
-async function writeTransaction (messages: Msg[], fileName: string) {
+async function writeTransactionsBatch (messages: any[], batchId: number) {
+  const fileName = `treasury-delegations-${batchId}.json`
   const gasEstimate = messages.length * 500000
   const gasPrice = 1
+
   const transaction = {
-    type: 'cosmos-sdk/StdTx',
-    value: {
-      msg: messages,
+    body: {
+      messages,
+      memo: 'Treasury Delegations',
+      timeoutHeight: 0,
+      extensionOptions: [],
+      nonCriticalExtensionOptions: []
+    },
+    authInfo: {
       fee: {
         amount: [
           {
@@ -205,44 +218,97 @@ async function writeTransaction (messages: Msg[], fileName: string) {
             amount: (gasEstimate * gasPrice).toFixed(0)
           }
         ],
-        gas: gasEstimate.toFixed(0)
+        gasLimit: gasEstimate,
+        payer: '',
+        granter: ''
       },
-      signatures: null,
-      memo: 'Treasury Delegations'
-    }
+      signerInfos: []
+    },
+    signatures: []
   }
+
   const buffer = JSON.stringify(transaction, null, 2)
   writeFileSync(fileName, buffer)
+}
+
+function writeTransactions (messages: any[]) {
+  let batchNumber = 0
+  let batchMessages = []
+  for (const message of messages) {
+    batchMessages.push(message)
+    if (batchMessages.length === 50) {
+      writeTransactionsBatch(batchMessages, ++batchNumber)
+      batchMessages = []
+    }
+  }
+  if (messages.length > 0) {
+    writeTransactionsBatch(batchMessages, ++batchNumber)
+  }
 }
 
 function writeCsv (targets: Target[], fileName: string) {
   let currentTotalDelegations = 0
   let updatedTotalDelegations = 0
+  let currentTreasuryDelegations = 0
+  let updatedTreasuryDelegations = 0
   for (const target of targets) {
     currentTotalDelegations += target.currentDelegations.totalDelegation
-    updatedTotalDelegations += target.totalDelegation + target.currentDelegations.selfDelegation + target.currentDelegations.communityDelegation
+    updatedTotalDelegations += target.currentDelegations.totalDelegation - target.currentDelegations.treasuryDelegation + target.totalDelegation
+    currentTreasuryDelegations += target.currentDelegations.treasuryDelegation
+    updatedTreasuryDelegations += target.totalDelegation
   }
-  console.dir({ currentTotalDelegations, updatedTotalDelegations })
+  console.dir({ currentTotalDelegations, updatedTotalDelegations, currentTreasuryDelegations, updatedTreasuryDelegations })
 
-  let buffer = 'Moniker,OperatorAddress,Commission,Number of Delegations,Current Self Delegation,Current Community Delegation,New Base Delegation,Self Delegation Bonus,Community Delegation Bonus,Total Delegation,Current Voting Power,Updated Voting Power,Delta Voting Power\n'
+  let buffer = 'Moniker,OperatorAddress,Commission,Number of Delegations,Current Self Delegation,Current Treasury Delegation,Current Project Delegation,Current Community Delegation,New Base Delegation,Self Delegation Bonus,Community Delegation Bonus,Total Delegation,Current Voting Power,Updated Voting Power,Delta Voting Power\n'
   for (const target of targets) {
     const currentVotingPower = target.currentDelegations.totalDelegation / currentTotalDelegations
-    const updatedVotingPower = (target.totalDelegation + target.currentDelegations.selfDelegation + target.currentDelegations.communityDelegation) / updatedTotalDelegations
+    const updatedVotingPower = (target.totalDelegation + target.currentDelegations.selfDelegation + target.currentDelegations.projectDelegation + target.currentDelegations.communityDelegation) / updatedTotalDelegations
     const deltaVotingPower = updatedVotingPower - currentVotingPower
-    buffer += `${target.moniker},${target.operatorAddress},${target.commission.toFixed(2)},` +
-    `${target.currentDelegations.numDelegators},${(target.currentDelegations.selfDelegation / ungm).toFixed(0)},${(target.currentDelegations.communityDelegation / ungm).toFixed(0)},` +
-    `${(target.baseDelegation / ungm).toFixed(0)},${(target.selfDelegationBonus / ungm).toFixed(0)},${(target.communityDelegationBonus / ungm).toFixed(0)},${(target.totalDelegation / ungm).toFixed(0)},` +
-    `${currentVotingPower.toFixed(4)},${updatedVotingPower.toFixed(4)},${deltaVotingPower.toFixed(4)}\n`
+    buffer += target.moniker + ',' +
+      target.operatorAddress + ',' +
+      target.commission.toFixed(2) + ',' +
+      target.currentDelegations.numDelegators + ',' +
+      (target.currentDelegations.selfDelegation / ungm).toFixed(0) + ',' +
+      (target.currentDelegations.treasuryDelegation / ungm).toFixed(0) + ',' +
+      (target.currentDelegations.projectDelegation / ungm).toFixed(0) + ',' +
+      (target.currentDelegations.communityDelegation / ungm).toFixed(0) + ',' +
+      (target.baseDelegation / ungm).toFixed(0) + ',' +
+      (target.selfDelegationBonus / ungm).toFixed(0) + ',' +
+      (target.communityDelegationBonus / ungm).toFixed(0) + ',' +
+      (target.totalDelegation / ungm).toFixed(0) + ',' +
+      currentVotingPower.toFixed(4) + ',' +
+      updatedVotingPower.toFixed(4) + ',' +
+      deltaVotingPower.toFixed(4) + '\n'
   }
 
   writeFileSync(fileName, buffer)
 }
 
-const bondedValidators = await client.staking.validators({ status: 'bonded' })
-const unbondingValidators = await client.staking.validators({ status: 'unbonding' })
-const unbondedValidators = await client.staking.validators({ status: 'unbonded' })
-const validators = bondedValidators.result.concat(unbondingValidators.result).concat(unbondedValidators.result)
-const targets = await createTargets(validators)
-writeCsv(targets, 'allocations.csv')
-const messages = await createMessages(targets)
-writeTransaction(messages, 'treasury-delegations.json')
+async function getPaginatedValidators (client, status: BondStatusString) : Promise<Validator[]> {
+  let response = await client.staking.validators(status)
+  let result: Validator[] = response.validators
+  while (response.pagination.nextKey.length > 0) {
+    response = await client.staking.validators(status, response.pagination.nextKey)
+    result = result.concat(response.validators)
+  }
+  return result
+}
+
+async function run () {
+  const tendermint = await Tendermint34Client.connect(rpcUrl)
+  const client = QueryClient.withExtensions(
+    tendermint,
+    setupStakingExtension,
+    setupDistributionExtension
+  )
+  const bondedValidators = await getPaginatedValidators(client, 'BOND_STATUS_BONDED')
+  const unbondingValidators = await getPaginatedValidators(client, 'BOND_STATUS_UNBONDING')
+  const unbondedValidators = await getPaginatedValidators(client, 'BOND_STATUS_UNBONDED')
+  const validators = bondedValidators.concat(unbondingValidators).concat(unbondedValidators)
+  const targets = await createTargets(client, validators)
+  writeCsv(targets, 'allocations.csv')
+  const messages = await createMessages(client, targets)
+  writeTransactions(messages)
+}
+
+run().then(() => {})
