@@ -1,7 +1,16 @@
 # Automated Treasury Delegations
 
-**Upcoming Changes**
-Due to high demand we'll be adjusting the eligibility requirements from November 2021. Only validators with an excess of 1000 NGM at stake through external delegations will be eligible to receive treasury delegations. This number is expected to increase over time.
+## Upcoming Changes
+Due to an increasing number of validators joining the network, the e-Money treasury is currently delegating more than 42M NGM out of a total supply of 110M.
+
+While we are happy to welcome new validators, the high number of NGM delegated has resulted in staking yields in the 17% range which seems unlikely to attract new delegators.
+
+To address the above, the following changes will come into effect from November 2021 and onwards:
+
+* To be eligible for treasury rewards, only validators with an excess of 1000 NGM at stake through self delegation and 3rd parties will be eligible. This number is expected to increase over time.
+* A scaling parameter is introduced that to adjust the delegation, initially by reducing them by 10%. Further reductions to be expected over time, starting with 10% the next 3 months.
+
+As a result of these changes, validators will observe a reduction in the treasury delegation in the form of an undelegation. However, since this is applied across the board, it will not greatly affect the earned commission or voting power for the individual validator.
 
 ## Rationale
 The treasury delegations are intended as a "Universal Basic Income" to help cover validator operating costs.
@@ -13,7 +22,7 @@ As such self delegations are rewarded with a delegation bonus, calculated as the
 
 Finally, to incentivise outreach and promotion of their e-Money validator service, the treasury will also match the first 250000 NGM community delegations. 
 
-Moving forward it is the intention to adjust delegations around the start of each a month using the below algorithm. 
+Adjustments to the delegations will be made around the start of each a month using the below algorithm. 
 
 ## Algorithm
 The delegation algorithm uses the following variables when considering how much to allocate to a validator:
@@ -25,13 +34,15 @@ The delegation algorithm uses the following variables when considering how much 
 | communityDelegation | The current community delegation for the validator. |
 
 It uses the following constants:
-| Constants                       | Value  | Description                                                                      |
-| ------------------------------- | ------ | -------------------------------------------------------------------------------- |
-| medianDelegation                | 500000 | Delegated NGM if the validator commission matches the median for all validators. |
-| maximumBaselineDelegation       | 750000 | Maximum NGM delegated after adjusting for commission.                            |
-| maximumSelfDelegationBonus      | 500000 | Maximum NGM added as a bonus for self-delegation.                                |
-| maximumCommunityDelegationBonus | 250000 | Maximum NGM added as a bonus for community delegations.                          |
-| selfDelegationMultiplier        | 2      | Multiplier for calculating self-delegation bonus.                                |
+| Constants                       | Value            | Description                                                                      |
+| ------------------------------- | ---------------- | -------------------------------------------------------------------------------- |
+| minimumExternalDelegations      | 1000             | The minimum amount of external delegations for a validator to be eligible.       |
+| scaling                         | 0.9              | Scaling value used to adjust some of the constants below.                        |
+| medianDelegation                | 500000 * scaling | Delegated NGM if the validator commission matches the median for all validators. |
+| maximumBaselineDelegation       | 750000 * scaling | Maximum NGM delegated after adjusting for commission.                            |
+| maximumSelfDelegationBonus      | 500000 * scaling | Maximum NGM added as a bonus for self-delegation.                                |
+| maximumCommunityDelegationBonus | 250000 * scaling | Maximum NGM added as a bonus for community delegations.                          |
+| selfDelegationMultiplier        | 2                | Multiplier for calculating self-delegation bonus.                                |
 
 The total delegation per validator is calculated as:
 ```

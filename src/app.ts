@@ -11,10 +11,11 @@ import * as configuration from '../data/configuration.json'
 const rpcUrl = 'https://emoney.validator.network'
 const treasuryAddress = 'emoney1cpfn66xumevrx755m4qxgezw9j5s86qkan5ch8'
 const ungm = 1000000
-const medianDelegation = 500000 * ungm
-const maximumBaselineDelegation = 750000 * ungm
-const maximumSelfDelegationBonus = 500000 * ungm
-const maximumCommunityDelegationBonus = 250000 * ungm
+const scaling = 0.90
+const medianDelegation = scaling * 500000 * ungm
+const maximumBaselineDelegation = scaling * 750000 * ungm
+const maximumSelfDelegationBonus = scaling * 500000 * ungm
+const maximumCommunityDelegationBonus = scaling * 250000 * ungm
 const minimumExternalDelegations = 1000 * ungm
 const selfDelegationMultiplier = 2
 const commissionFraction = 1000000000000000000
@@ -119,11 +120,11 @@ async function createTargets (client, validators: Validator[]): Promise<Target[]
     const communityDelegationBonus = Math.min(maximumCommunityDelegationBonus, currentDelegations.communityDelegation)
     const totalDelegation = baseDelegation + selfDelegationBonus + communityDelegationBonus
 
-    // const externalDelegations = currentDelegations.totalDelegation - currentDelegations.treasuryDelegation
-    // if (externalDelegations < minimumExternalDelegations) {
-    //   console.log(`Below minimum external delegations: ${validator.description.moniker} (${validator.operatorAddress}) @ ${externalDelegations / ungm} NGM`)
-    //   continue
-    // }
+    const externalDelegations = currentDelegations.totalDelegation - currentDelegations.treasuryDelegation
+    if (externalDelegations < minimumExternalDelegations) {
+      console.log(`Below minimum external delegations: ${validator.description.moniker} (${validator.operatorAddress}) @ ${externalDelegations / ungm} NGM`)
+      continue
+    }
 
     result.push({
       moniker: validator.description.moniker,
