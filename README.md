@@ -59,3 +59,5 @@ Example data is available here: [allocations.csv](allocations.csv)
 ## How to Apply
 
 Create a Pull Request that adds your validator to the validatorWhitelist in [data/configuration.json](data/configuration.json).
+
+Please provide information in the pull request on past experience in operating validator nodes and overall details on the setup.
