@@ -10,7 +10,7 @@ To address the above, the following changes will come into effect from November 
 * To be eligible for treasury rewards, only validators with an excess of 1000 NGM at stake through self delegation and 3rd parties will be eligible. This number is expected to increase over time.
 * A scaling parameter is introduced that to adjust the delegation, initially by reducing them by 10%. Further reductions to be expected over time, starting with 10% the next 3 months.
 
-As a result of the seconds change, validators will observe a reduction in the treasury delegation in the form of an undelegation. However, since this is applied across the entire validator set, it will not greatly affect the earned commission or voting power for each individual validator.
+As a result of the second change, validators will observe a reduction in the treasury delegation in the form of an undelegation. However, since this is applied across the entire validator set, it will not greatly affect the earned commission or voting power for each individual validator.
 
 ## Rationale
 The treasury delegations are intended as a "Universal Basic Income" to help cover validator operating costs.
