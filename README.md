@@ -7,7 +7,8 @@ While we are happy to welcome new validators, the high number of NGM delegated h
 
 To address the above, the following changes will come into effect from November 2021 and onwards:
 
-* To be eligible for treasury rewards, only validators with an excess of 1000 NGM at stake through self delegation and 3rd parties will be eligible. This number is expected to increase over time.
+* Only validators with a minimum commission of 5% will be eligible for delegations. This is to avoid a "race to the bottom" on commissions.
+* Only validators with an excess of 1000 NGM at stake through self delegation and 3rd parties will be eligible for delegations. This number is expected to increase over time.
 * A scaling parameter is introduced that to adjust the delegation, initially by reducing them by 10%. Further reductions to be expected over time, starting with 10% the next 3 months.
 
 As a result of the second change, validators will observe a reduction in the treasury delegation in the form of an undelegation. However, since this is applied across the entire validator set, it will not greatly affect the earned commission or voting power for each individual validator.
@@ -36,7 +37,8 @@ The delegation algorithm uses the following variables when considering how much 
 It uses the following constants:
 | Constants                       | Value            | Description                                                                      |
 | ------------------------------- | ---------------- | -------------------------------------------------------------------------------- |
-| minimumExternalDelegations      | 1000             | The minimum amount of external delegations for a validator to be eligible.       |
+| minimumCommission               | 0.5              | The minimum commission for a validator to be eligible.                           |
+| minimumExternalDelegations      | 2000             | The minimum amount of external delegations for a validator to be eligible.       |
 | scaling                         | 0.9              | Scaling value used to adjust some of the constants below.                        |
 | medianDelegation                | 500000 * scaling | Delegated NGM if the validator commission matches the median for all validators. |
 | maximumBaselineDelegation       | 750000 * scaling | Maximum NGM delegated after adjusting for commission.                            |

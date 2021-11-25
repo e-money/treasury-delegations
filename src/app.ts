@@ -17,6 +17,7 @@ const maximumBaselineDelegation = scaling * 750000 * ungm
 const maximumSelfDelegationBonus = scaling * 500000 * ungm
 const maximumCommunityDelegationBonus = scaling * 250000 * ungm
 const minimumExternalDelegations = 1000 * ungm
+const minimumCommission = 0.05
 const selfDelegationMultiplier = 2
 const commissionFraction = 1000000000000000000
 
@@ -30,6 +31,7 @@ class Delegations {
 }
 
 class Target {
+  enabled: boolean
   moniker: string
   operatorAddress: string
   commission: number
@@ -48,8 +50,9 @@ function includeValidator (validator: Validator): boolean {
 function getMedianCommission (validators: Validator[]): number {
   const commissions: number[] = []
   for (const validator of validators) {
-    if (includeValidator(validator)) {
-      commissions.push(Number(validator.commission.commissionRates.rate) / commissionFraction)
+    const commission = Number(validator.commission.commissionRates.rate) / commissionFraction
+    if (includeValidator(validator) && commission >= minimumCommission) {
+      commissions.push(commission)
     }
   }
   return median(commissions)
@@ -111,22 +114,30 @@ async function createTargets (client, validators: Validator[]): Promise<Target[]
   console.log(`Median commission: ${medianCommission}`)
   const result: Target[] = []
   for (const validator of validators) {
-    if (!includeValidator(validator)) continue
     const commission = Number(validator.commission.commissionRates.rate) / commissionFraction
-    const commissionAdjustment = medianCommission / commission
     const currentDelegations = await getDelegations(client, validator.operatorAddress)
-    const baseDelegation = Math.min(maximumBaselineDelegation, Math.round(commissionAdjustment * medianDelegation))
-    const selfDelegationBonus = Math.min(maximumSelfDelegationBonus, Math.round(currentDelegations.selfDelegation * selfDelegationMultiplier))
-    const communityDelegationBonus = Math.min(maximumCommunityDelegationBonus, currentDelegations.communityDelegation)
-    const totalDelegation = baseDelegation + selfDelegationBonus + communityDelegationBonus
-
     const externalDelegations = currentDelegations.totalDelegation - currentDelegations.treasuryDelegation
-    if (externalDelegations < minimumExternalDelegations) {
-      console.log(`Below minimum external delegations: ${validator.description.moniker} (${validator.operatorAddress}) @ ${externalDelegations / ungm} NGM`)
-      continue
+
+    let enabled = true
+    if (!includeValidator(validator)) {
+      // console.log(`Skipping: ${validator.description.moniker} (${validator.operatorAddress})`)
+      enabled = false
+    } else if (externalDelegations < minimumExternalDelegations) {
+      console.log(`Below minimum external delegations: ${validator.description.moniker} (${validator.operatorAddress}) @ ${(externalDelegations / ungm).toFixed(0)} NGM`)
+      enabled = false
+    } else if (commission < minimumCommission) {
+      console.log(`Below minimum commission: ${validator.description.moniker} (${validator.operatorAddress}) @ ${(100 * commission).toFixed(2)}%`)
+      enabled = false
     }
 
+    const commissionAdjustment = medianCommission / commission
+    const baseDelegation = enabled ? Math.min(maximumBaselineDelegation, Math.round(commissionAdjustment * medianDelegation)) : 0
+    const selfDelegationBonus = enabled ? Math.min(maximumSelfDelegationBonus, Math.round(currentDelegations.selfDelegation * selfDelegationMultiplier)) : 0
+    const communityDelegationBonus = enabled ? Math.min(maximumCommunityDelegationBonus, currentDelegations.communityDelegation) : 0
+    const totalDelegation = baseDelegation + selfDelegationBonus + communityDelegationBonus
+
     result.push({
+      enabled,
       moniker: validator.description.moniker,
       operatorAddress: validator.operatorAddress,
       commission,
@@ -163,9 +174,6 @@ async function createMessages (client, targets: Target[]): Promise<any[]> {
   // Adjust existing delegations
   for (const delegationResponse of delegationResponses) {
     const target = targets.find(item => item.operatorAddress === delegationResponse.delegation.validatorAddress)
-    if (!target) {
-      console.log(`Removing: ${delegationResponse.delegation.validatorAddress}`)
-    }
     const targetDelegation = target ? target.totalDelegation : 0
     const deltaDelegation = targetDelegation - Number(delegationResponse.balance.amount)
     if (Math.abs(deltaDelegation) < 1000000) continue
@@ -191,7 +199,7 @@ async function createMessages (client, targets: Target[]): Promise<any[]> {
   // Add new delegations
   for (const target of targets) {
     const delegation = delegationResponses.find(item => item.delegation.validatorAddress === target.operatorAddress)
-    if (!delegation) {
+    if (!delegation && target.enabled) {
       const msg = {
         '@type': '/cosmos.staking.v1beta1.MsgDelegate',
         delegator_address: treasuryAddress,
@@ -260,14 +268,15 @@ function writeCsv (targets: Target[], fileName: string) {
   let updatedTreasuryDelegations = 0
   for (const target of targets) {
     currentTotalDelegations += target.currentDelegations.totalDelegation
-    updatedTotalDelegations += target.currentDelegations.totalDelegation - target.currentDelegations.treasuryDelegation + target.totalDelegation
     currentTreasuryDelegations += target.currentDelegations.treasuryDelegation
+    updatedTotalDelegations += target.currentDelegations.totalDelegation - target.currentDelegations.treasuryDelegation + target.totalDelegation
     updatedTreasuryDelegations += target.totalDelegation
   }
   console.dir({ currentTotalDelegations, updatedTotalDelegations, currentTreasuryDelegations, updatedTreasuryDelegations })
 
   let buffer = 'Moniker,OperatorAddress,Commission,Number of Delegations,Current Self Delegation,Current Treasury Delegation,Current Project Delegation,Current Community Delegation,New Base Delegation,Self Delegation Bonus,Community Delegation Bonus,Total Delegation,Current Voting Power,Updated Voting Power,Delta Voting Power\n'
   for (const target of targets) {
+    if (!target.enabled) continue
     const currentVotingPower = target.currentDelegations.totalDelegation / currentTotalDelegations
     const updatedVotingPower = (target.totalDelegation + target.currentDelegations.selfDelegation + target.currentDelegations.projectDelegation + target.currentDelegations.communityDelegation) / updatedTotalDelegations
     const deltaVotingPower = updatedVotingPower - currentVotingPower
