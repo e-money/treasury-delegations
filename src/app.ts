@@ -176,7 +176,7 @@ async function createMessages (client, targets: Target[]): Promise<any[]> {
     const target = targets.find(item => item.operatorAddress === delegationResponse.delegation.validatorAddress)
     const targetDelegation = target ? target.totalDelegation : 0
     const deltaDelegation = targetDelegation - Number(delegationResponse.balance.amount)
-    if (Math.abs(deltaDelegation) < 1000000) continue
+    if (Math.abs(deltaDelegation) < ungm) continue
     if (deltaDelegation > 0) {
       const msg = {
         '@type': '/cosmos.staking.v1beta1.MsgDelegate',
