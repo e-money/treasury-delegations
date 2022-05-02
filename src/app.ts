@@ -11,12 +11,12 @@ import * as configuration from '../data/configuration.json'
 const rpcUrl = 'https://emoney.validator.network'
 const treasuryAddress = 'emoney1cpfn66xumevrx755m4qxgezw9j5s86qkan5ch8'
 const ungm = 1000000
-const scaling = 0.6
+const scaling = 0.5
 const medianDelegation = scaling * 500000 * ungm
 const maximumBaselineDelegation = scaling * 750000 * ungm
 const maximumSelfDelegationBonus = scaling * 500000 * ungm
 const maximumCommunityDelegationBonus = scaling * 250000 * ungm
-const minimumExternalDelegations = 2000 * ungm
+const minimumExternalDelegations = 3000 * ungm
 const minimumCommission = 0.05
 const selfDelegationMultiplier = 2
 const commissionFraction = 1000000000000000000
