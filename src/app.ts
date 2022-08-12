@@ -42,12 +42,12 @@ class Target {
   totalDelegation: number
 }
 
-function includeValidator (validator: Validator): boolean {
+function includeValidator(validator: Validator): boolean {
   if (validator.jailed) return false
   return configuration.validatorWhitelist.includes(validator.operatorAddress)
 }
 
-function getMedianCommission (validators: Validator[]): number {
+function getMedianCommission(validators: Validator[]): number {
   const commissions: number[] = []
   for (const validator of validators) {
     const commission = Number(validator.commission.commissionRates.rate) / commissionFraction
@@ -58,7 +58,7 @@ function getMedianCommission (validators: Validator[]): number {
   return median(commissions)
 }
 
-async function getPaginatedDelegations (client, validatorAddress: string) : Promise<DelegationResponse[]> {
+async function getPaginatedDelegations(client, validatorAddress: string): Promise<DelegationResponse[]> {
   let response = await client.staking.validatorDelegations(validatorAddress)
   let result: DelegationResponse[] = response.delegationResponses
   while (response.pagination.nextKey.length > 0) {
@@ -68,7 +68,7 @@ async function getPaginatedDelegations (client, validatorAddress: string) : Prom
   return result
 }
 
-async function getDelegations (client, validatorAddress: string): Promise<Delegations> {
+async function getDelegations(client, validatorAddress: string): Promise<Delegations> {
   const projectAddresses = [
     treasuryAddress,
     'emoney10r47ldzrc2nj6p85cg9hfy3q7d6ce5870qfc3y',
@@ -109,7 +109,7 @@ async function getDelegations (client, validatorAddress: string): Promise<Delega
   return result
 }
 
-async function createTargets (client, validators: Validator[]): Promise<Target[]> {
+async function createTargets(client, validators: Validator[]): Promise<Target[]> {
   const medianCommission = getMedianCommission(validators)
   console.log(`Median commission: ${medianCommission}`)
   const result: Target[] = []
@@ -157,7 +157,7 @@ async function createTargets (client, validators: Validator[]): Promise<Target[]
   return result
 }
 
-async function getPaginatedDelegatorDelegations (client, delegatorAddress: string) : Promise<DelegationResponse[]> {
+async function getPaginatedDelegatorDelegations(client, delegatorAddress: string): Promise<DelegationResponse[]> {
   let response = await client.staking.delegatorDelegations(delegatorAddress)
   let result: DelegationResponse[] = response.delegationResponses
   while (response.pagination.nextKey.length > 0) {
@@ -167,7 +167,7 @@ async function getPaginatedDelegatorDelegations (client, delegatorAddress: strin
   return result
 }
 
-async function createMessages (client, targets: Target[]): Promise<any[]> {
+async function createMessages(client, targets: Target[]): Promise<any[]> {
   const result = []
   const delegationResponses = await getPaginatedDelegatorDelegations(client, treasuryAddress)
 
@@ -212,7 +212,7 @@ async function createMessages (client, targets: Target[]): Promise<any[]> {
   return result
 }
 
-async function writeTransactionsBatch (messages: any[], batchId: number) {
+async function writeTransactionsBatch(messages: any[], batchId: number) {
   const fileName = `treasury-delegations-${batchId}.json`
   const gasEstimate = messages.length * 500000
   const gasPrice = 1
@@ -246,12 +246,12 @@ async function writeTransactionsBatch (messages: any[], batchId: number) {
   writeFileSync(fileName, buffer)
 }
 
-function writeTransactions (messages: any[]) {
+function writeTransactions(messages: any[]) {
   let batchNumber = 0
   let batchMessages = []
   for (const message of messages) {
     batchMessages.push(message)
-    if (batchMessages.length === 50) {
+    if (batchMessages.length === 30) {
       writeTransactionsBatch(batchMessages, ++batchNumber)
       batchMessages = []
     }
@@ -261,7 +261,7 @@ function writeTransactions (messages: any[]) {
   }
 }
 
-function writeCsv (targets: Target[], fileName: string) {
+function writeCsv(targets: Target[], fileName: string) {
   let currentTotalDelegations = 0
   let updatedTotalDelegations = 0
   let currentTreasuryDelegations = 0
@@ -300,7 +300,7 @@ function writeCsv (targets: Target[], fileName: string) {
   writeFileSync(fileName, buffer)
 }
 
-async function getPaginatedValidators (client, status: BondStatusString) : Promise<Validator[]> {
+async function getPaginatedValidators(client, status: BondStatusString): Promise<Validator[]> {
   let response = await client.staking.validators(status)
   let result: Validator[] = response.validators
   while (response.pagination.nextKey.length > 0) {
@@ -310,7 +310,7 @@ async function getPaginatedValidators (client, status: BondStatusString) : Promi
   return result
 }
 
-async function run () {
+async function run() {
   const tendermint = await Tendermint34Client.connect(rpcUrl)
   const client = QueryClient.withExtensions(
     tendermint,
@@ -327,4 +327,4 @@ async function run () {
   writeTransactions(messages)
 }
 
-run().then(() => {})
+run().then(() => { })
