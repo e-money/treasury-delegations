@@ -16,7 +16,7 @@ const medianDelegation = scaling * 500000 * ungm
 const maximumBaselineDelegation = scaling * 750000 * ungm
 const maximumSelfDelegationBonus = scaling * 500000 * ungm
 const maximumCommunityDelegationBonus = scaling * 250000 * ungm
-const minimumExternalDelegations = 3000 * ungm
+const minimumExternalDelegations = 4000 * ungm
 const minimumCommission = 0.05
 const selfDelegationMultiplier = 2
 const commissionFraction = 1000000000000000000
@@ -176,7 +176,9 @@ async function createMessages(client, targets: Target[]): Promise<any[]> {
     const target = targets.find(item => item.operatorAddress === delegationResponse.delegation.validatorAddress)
     const targetDelegation = target ? target.totalDelegation : 0
     const deltaDelegation = targetDelegation - Number(delegationResponse.balance.amount)
-    if (Math.abs(deltaDelegation) < ungm) continue
+    if (Math.abs(deltaDelegation) < ungm) {
+      continue
+    }
     if (deltaDelegation > 0) {
       const msg = {
         '@type': '/cosmos.staking.v1beta1.MsgDelegate',
