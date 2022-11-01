@@ -1,7 +1,6 @@
 # Automated Treasury Delegations
 
 ## How to Apply
-
 Create a Pull Request that adds your validator to the validatorWhitelist in [data/configuration.json](data/configuration.json).
 
 Please provide information in the pull request on past experience in operating validator nodes and overall details on the setup.
@@ -55,9 +54,8 @@ totalDelegation = baseDelegation + selfDelegationBonus + communityDelegationBonu
 Example data is available here: [allocations.csv](allocations.csv)
 
 ## Planned Parameter Changes
-| Date            | Change               |
-| ------------------- | --------------------------------------------------- |
-| 2022-12-01      | minimumExternalDelegations = 4000      |
-| 2023-01-01      | minimumExternalDelegations = 5000      |
-| 2023-02-01      | minimumExternalDelegations = 6000      |
-
+| Date                | Change                            |
+| ------------------- | --------------------------------- |
+| 2022-12-01          | minimumExternalDelegations = 4000 |
+| 2023-01-01          | minimumExternalDelegations = 5000 |
+| 2023-02-01          | minimumExternalDelegations = 6000 |
