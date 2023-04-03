@@ -34,7 +34,7 @@ It uses the following constants:
 | ------------------------------- | ---------------- | -------------------------------------------------------------------------------- |
 | minimumCommission               | 0.05 (5%)        | The minimum commission for a validator to be eligible.                           |
 | minimumExternalDelegations      | 3000             | The minimum amount of external delegations for a validator to be eligible.       |
-| scaling                         | 0.5              | Scaling value used to adjust some of the constants below.                        |
+| scaling                         | 0.6              | Scaling value used to adjust some of the constants below.                        |
 | medianDelegation                | 500000 * scaling | Delegated NGM if the validator commission matches the median for all validators. |
 | maximumBaselineDelegation       | 750000 * scaling | Maximum NGM delegated after adjusting for commission.                            |
 | maximumSelfDelegationBonus      | 500000 * scaling | Maximum NGM added as a bonus for self-delegation.                                |
